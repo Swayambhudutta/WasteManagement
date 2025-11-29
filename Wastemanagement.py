@@ -16,8 +16,14 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import altair as alt
-import plotly.graph_objects as go
 import datetime
+
+# Try to import Plotly. If missing, we'll degrade gracefully.
+PLOTLY_AVAILABLE = True
+try:
+    import plotly.graph_objects as go
+except Exception:
+    PLOTLY_AVAILABLE = False
 
 # -----------------------------
 # Synthetic Data (Demo Only)
@@ -108,8 +114,9 @@ alerts_list = [
 # Helper / Domain Functions
 # -----------------------------
 def days_to_deadline(deadline_str: str) -> int:
-    deadline = datetime.datetime.strptime(deadline_str, '%Y-%m-%d').date()
-    today = datetime.date.today()
+    import datetime as _dt
+    deadline = _dt.datetime.strptime(deadline_str, '%Y-%m-%d').date()
+    today = _dt.date.today()
     return max(0, (deadline - today).days)
 
 timeline_rules = [{"rule": r["id"], "daysToDeadline": days_to_deadline(r["deadline"])} for r in regulatory_feed]
@@ -192,77 +199,87 @@ def render_landing():
 
     # ---- Sankey for Waste Flow ----
     st.subheader('Waste Flow Sankey – Generation → Processing Outcomes')
-    # Define nodes and colors
-    nodes = ["Plastic", "E‑Waste", "Battery", "Recycle", "Reuse", "Co‑process", "Landfill"]
-    node_colors = [
-        "#38bdf8",  # Plastic
-        "#f59e0b",  # E‑Waste
-        "#22c55e",  # Battery
-        "#22c55e",  # Recycle
-        "#60a5fa",  # Reuse
-        "#a78bfa",  # Co‑process
-        "#ef4444"   # Landfill
-    ]
-    # Flows (values are synthetic; they sum to collected volumes above)
-    # Index map: 0:Plastic, 1:E‑Waste, 2:Battery, 3:Recycle, 4:Reuse, 5:Co‑process, 6:Landfill
-    source = [
-        0, 0, 0, 0,      # Plastic -> Recycle, Reuse, Co‑process, Landfill
-        1, 1, 1,         # E‑Waste -> Recycle, Reuse, Landfill
-        2, 2, 2          # Battery -> Recycle, Reuse, Landfill
-    ]
-    target = [
-        3, 4, 5, 6,      # Plastic flows
-        3, 4, 6,         # E‑Waste flows
-        3, 4, 6          # Battery flows
-    ]
-    value = [
-        300, 280, 500, 120,   # Plastic totals = 1200
-        120, 45, 15,          # E‑Waste totals = 180
-        160, 50, 10           # Battery totals = 220
-    ]
+    if not PLOTLY_AVAILABLE:
+        st.warning(
+            "Plotly is not installed, so the Sankey cannot be rendered. "
+            "Install Plotly and rerun: `pip install plotly`."
+        )
+    else:
+        # Define nodes and colors
+        nodes = ["Plastic", "E‑Waste", "Battery", "Recycle", "Reuse", "Co‑process", "Landfill"]
+        node_colors = [
+            "#38bdf8",  # Plastic
+            "#f59e0b",  # E‑Waste
+            "#22c55e",  # Battery
+            "#22c55e",  # Recycle
+            "#60a5fa",  # Reuse
+            "#a78bfa",  # Co‑process
+            "#ef4444"   # Landfill
+        ]
+        # Flows (synthetic; sums match the stacked bars above)
+        # Index map: 0:Plastic, 1:E‑Waste, 2:Battery, 3:Recycle, 4:Reuse, 5:Co‑process, 6:Landfill
+        source = [
+            0, 0, 0, 0,      # Plastic -> Recycle, Reuse, Co‑process, Landfill
+            1, 1, 1,         # E‑Waste -> Recycle, Reuse, Landfill
+            2, 2, 2          # Battery -> Recycle, Reuse, Landfill
+        ]
+        target = [
+            3, 4, 5, 6,      # Plastic flows
+            3, 4, 6,         # E‑Waste flows
+            3, 4, 6          # Battery flows
+        ]
+        value = [
+            300, 280, 500, 120,   # Plastic totals = 1200
+            120, 45, 15,          # E‑Waste totals = 180
+            160, 50, 10           # Battery totals = 220
+        ]
 
-    sankey_fig = go.Figure(
-        go.Sankey(
-            arrangement="snap",
-            node=dict(
-                pad=18, thickness=24,
-                line=dict(color="rgba(255,255,255,0.3)", width=1),
-                label=nodes,
-                color=node_colors
-            ),
-            link=dict(
-                source=source,
-                target=target,
-                value=value,
-                color=[
-                    "#22c55e", "#60a5fa", "#a78bfa", "#ef4444",  # Plastic links
-                    "#22c55e", "#60a5fa", "#ef4444",             # E‑Waste links
-                    "#22c55e", "#60a5fa", "#ef4444"              # Battery links
-                ]
+        import plotly.graph_objects as go  # safe (PLOTLY_AVAILABLE checked)
+        sankey_fig = go.Figure(
+            go.Sankey(
+                arrangement="snap",
+                node=dict(
+                    pad=18, thickness=24,
+                    line=dict(color="rgba(255,255,255,0.3)", width=1),
+                    label=nodes,
+                    color=node_colors
+                ),
+                link=dict(
+                    source=source,
+                    target=target,
+                    value=value,
+                    color=[
+                        "#22c55e", "#60a5fa", "#a78bfa", "#ef4444",  # Plastic links
+                        "#22c55e", "#60a5fa", "#ef4444",             # E‑Waste links
+                        "#22c55e", "#60a5fa", "#ef4444"              # Battery links
+                    ]
+                )
             )
         )
-    )
-    sankey_fig.update_layout(
-        template="plotly_dark",
-        height=420,
-        margin=dict(l=10, r=10, t=30, b=10)
-    )
-    st.plotly_chart(sankey_fig, use_container_width=True)
+        sankey_fig.update_layout(
+            template="plotly_dark",
+            height=420,
+            margin=dict(l=10, r=10, t=30, b=10)
+        )
+        st.plotly_chart(sankey_fig, use_container_width=True)
     # ---- End Sankey ----
 
     colA, colB, colC = st.columns(3)
     with colA:
         st.subheader('EPR Gap – Plastic (Waterfall)')
-        wf = pd.DataFrame(epr_waterfall_plastic)
-        fig = go.Figure(go.Waterfall(
-            orientation='v',
-            measure=['absolute','relative','relative','total'],
-            x=wf['stage'],
-            y=wf['amount'],
-            connector={'line': {'color': 'rgba(255,255,255,0.4)'}},
-        ))
-        fig.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), template='plotly_dark')
-        st.plotly_chart(fig, use_container_width=True)
+        if not PLOTLY_AVAILABLE:
+            st.info("Plotly not installed. Install Plotly to see the waterfall chart (`pip install plotly`).")
+        else:
+            wf = pd.DataFrame(epr_waterfall_plastic)
+            fig = go.Figure(go.Waterfall(
+                orientation='v',
+                measure=['absolute','relative','relative','total'],
+                x=wf['stage'],
+                y=wf['amount'],
+                connector={'line': {'color': 'rgba(255,255,255,0.4)'}},
+            ))
+            fig.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), template='plotly_dark')
+            st.plotly_chart(fig, use_container_width=True)
 
     with colB:
         st.subheader('Inventory Health – Days of Cover vs Lead Time')
@@ -279,23 +296,26 @@ def render_landing():
 
     with colC:
         st.subheader('Eco‑Design Spotlight (MCDA Radar)')
-        radar_df = pd.DataFrame([
-            {'metric':'Compliance','A':72,'B':88},
-            {'metric':'Cost (inverse)','A':60,'B':68},
-            {'metric':'Availability','A':70,'B':62},
-            {'metric':'Recyclability','A':55,'B':82},
-            {'metric':'Traceability','A':50,'B':80},
-        ])
-        fig2 = go.Figure()
-        fig2.add_trace(go.Scatterpolar(r=radar_df['A'], theta=radar_df['metric'],
-                                       fill='toself', name='Option A',
-                                       line=dict(color='#38bdf8')))
-        fig2.add_trace(go.Scatterpolar(r=radar_df['B'], theta=radar_df['metric'],
-                                       fill='toself', name='Option B',
-                                       line=dict(color='#22c55e')))
-        fig2.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,100])),
-                           showlegend=True, height=300, template='plotly_dark')
-        st.plotly_chart(fig2, use_container_width=True)
+        if not PLOTLY_AVAILABLE:
+            st.info("Plotly not installed. Install Plotly to see the radar chart (`pip install plotly`).")
+        else:
+            radar_df = pd.DataFrame([
+                {'metric':'Compliance','A':72,'B':88},
+                {'metric':'Cost (inverse)','A':60,'B':68},
+                {'metric':'Availability','A':70,'B':62},
+                {'metric':'Recyclability','A':55,'B':82},
+                {'metric':'Traceability','A':50,'B':80},
+            ])
+            fig2 = go.Figure()
+            fig2.add_trace(go.Scatterpolar(r=radar_df['A'], theta=radar_df['metric'],
+                                           fill='toself', name='Option A',
+                                           line=dict(color='#38bdf8')))
+            fig2.add_trace(go.Scatterpolar(r=radar_df['B'], theta=radar_df['metric'],
+                                           fill='toself', name='Option B',
+                                           line=dict(color='#22c55e')))
+            fig2.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,100])),
+                               showlegend=True, height=300, template='plotly_dark')
+            st.plotly_chart(fig2, use_container_width=True)
 
     st.subheader('Alert Backlog by Site')
     ab = pd.DataFrame(threshold_breaches_by_site)
@@ -412,12 +432,15 @@ def render_epr():
     st.altair_chart(chart, use_container_width=True)
 
     st.subheader('Gap Analysis – Plastic (Waterfall)')
-    wf = pd.DataFrame(epr_waterfall_plastic)
-    fig = go.Figure(go.Waterfall(orientation='v',
-                                 measure=['absolute','relative','relative','total'],
-                                 x=wf['stage'], y=wf['amount']))
-    fig.update_layout(height=300, template='plotly_dark')
-    st.plotly_chart(fig, use_container_width=True)
+    if not PLOTLY_AVAILABLE:
+        st.info("Plotly not installed. Install Plotly to see the waterfall chart (`pip install plotly`).")
+    else:
+        wf = pd.DataFrame(epr_waterfall_plastic)
+        fig = go.Figure(go.Waterfall(orientation='v',
+                                     measure=['absolute','relative','relative','total'],
+                                     x=wf['stage'], y=wf['amount']))
+        fig.update_layout(height=300, template='plotly_dark')
+        st.plotly_chart(fig, use_container_width=True)
 
     st.subheader('CPCB Reporting Status')
     cal = pd.DataFrame([
@@ -468,21 +491,24 @@ def render_ecodesign():
     scoreB = mcda_score(optionB, weights)
     st.write(f"**MCDA Score (Option A):** {scoreA} | **MCDA Score (Option B):** {scoreB}")
 
-    radar_df = pd.DataFrame([
-        {'metric':'Compliance','A': optionA['compliance'], 'B': optionB['compliance']},
-        {'metric':'Cost (inverse)','A': 100-optionA['cost'], 'B': 100-optionB['cost']},
-        {'metric':'Availability','A': optionA['availability'], 'B': optionB['availability']},
-        {'metric':'Recyclability','A': optionA['recyclability'], 'B': optionB['recyclability']},
-        {'metric':'Traceability','A': optionA['traceability'], 'B': optionB['traceability']},
-    ])
-    fig = go.Figure()
-    fig.add_trace(go.Scatterpolar(r=radar_df['A'], theta=radar_df['metric'],
-                                  fill='toself', name='Option A', line=dict(color='#38bdf8')))
-    fig.add_trace(go.Scatterpolar(r=radar_df['B'], theta=radar_df['metric'],
-                                  fill='toself', name='Option B', line=dict(color='#22c55e')))
-    fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,100])),
-                      showlegend=True, height=320, template='plotly_dark')
-    st.plotly_chart(fig, use_container_width=True)
+    if not PLOTLY_AVAILABLE:
+        st.info("Plotly not installed. Install Plotly to see the radar chart (`pip install plotly`).")
+    else:
+        radar_df = pd.DataFrame([
+            {'metric':'Compliance','A': optionA['compliance'], 'B': optionB['compliance']},
+            {'metric':'Cost (inverse)','A': 100-optionA['cost'], 'B': 100-optionB['cost']},
+            {'metric':'Availability','A': optionA['availability'], 'B': optionB['availability']},
+            {'metric':'Recyclability','A': optionA['recyclability'], 'B': optionB['recyclability']},
+            {'metric':'Traceability','A': optionA['traceability'], 'B': optionB['traceability']},
+        ])
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(r=radar_df['A'], theta=radar_df['metric'],
+                                      fill='toself', name='Option A', line=dict(color='#38bdf8')))
+        fig.add_trace(go.Scatterpolar(r=radar_df['B'], theta=radar_df['metric'],
+                                      fill='toself', name='Option B', line=dict(color='#22c55e')))
+        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0,100])),
+                          showlegend=True, height=320, template='plotly_dark')
+        st.plotly_chart(fig, use_container_width=True)
 
     st.subheader('Material Library & Substance Registry (Demo)')
     ml = pd.DataFrame(material_library)
@@ -586,4 +612,3 @@ elif view == "Eco‑Design & Substance Registry":
 elif view == "Production Communication":
     render_production()
 elif view == "Marketing & Sales":
-    render_marketing()
