@@ -18,6 +18,9 @@ import numpy as np
 import altair as alt
 import datetime
 
+# Streamlit page config (best placed near the top and only once)
+st.set_page_config(page_title='Waste Management Tool', layout='wide')
+
 # Try to import Plotly. If missing, we'll degrade gracefully.
 PLOTLY_AVAILABLE = True
 try:
@@ -570,9 +573,8 @@ def render_marketing():
     st.dataframe(sales, use_container_width=True)
 
 # -----------------------------
-# App Shell (Single Workflow)
+# Sidebar & View Selection
 # -----------------------------
-st.set_page_config(page_title='Waste Management Tool', layout='wide')
 with st.sidebar:
     st.title('Waste Mgmt Tool')
     st.selectbox('Period', ['FY 2025','FY 2026'], key='period')
@@ -596,7 +598,9 @@ with st.sidebar:
         index=0
     )
 
-# Render selected view
+# -----------------------------
+# Render selected view (Indentation fixed)
+# -----------------------------
 if view == "Landing":
     render_landing()
 elif view == "Mandatory Compliance":
